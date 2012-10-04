@@ -18,6 +18,7 @@ package org.gradle.integtests.fixtures
 import groovy.util.slurpersupport.GPathResult
 import org.gradle.util.TestFile
 import org.hamcrest.Matcher
+
 import static org.hamcrest.Matchers.*
 import static org.junit.Assert.assertThat
 
@@ -74,6 +75,14 @@ class JUnitTestClassExecutionResult implements TestClassExecutionResult {
     TestClassExecutionResult assertTestsExecuted(String... testNames) {
         Map<String, Node> testMethods = findTests()
         assertThat(testMethods.keySet(), equalTo(testNames as Set))
+        assert testClassNode.@tests == testNames.length
+        this
+    }
+
+    TestClassExecutionResult assertTestCount(int tests, int failures, int errors) {
+        assert testClassNode.@tests == tests
+        assert testClassNode.@failures == failures
+        assert testClassNode.@errors == errors
         this
     }
 

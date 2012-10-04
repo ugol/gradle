@@ -69,6 +69,10 @@ private class TestNgTestClassExecutionResult implements TestClassExecutionResult
         this.testClassNode = resultXml
     }
 
+    TestClassExecutionResult assertTestCount(int tests, int failures, int errors) {
+        throw new RuntimeException("Unsupported. Implement if you need it.");
+    }
+
     TestClassExecutionResult assertTestsExecuted(String... testNames) {
         def actualTestMethods = findTestMethods().keySet()
         org.junit.Assert.assertThat(actualTestMethods, org.hamcrest.Matchers.equalTo(testNames as Set))

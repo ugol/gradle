@@ -120,10 +120,11 @@ test {
 
         //then
         def junitResult = new JUnitTestExecutionResult(file("."));
-        junitResult.assertTestClassesExecuted("org.FailingTest",
-                "org.PassingTest", "org.MixedMethodsTest", "org.NoOutputsTest")
+        junitResult
+            .assertTestClassesExecuted("org.FailingTest","org.PassingTest", "org.MixedMethodsTest", "org.NoOutputsTest")
 
         junitResult.testClass("org.MixedMethodsTest")
+            .assertTestCount(4, 2, 0)
             .assertTestsExecuted("passing", "passing2", "failing", "failing2")
             .assertTestFailed("failing", equalTo('java.lang.AssertionError: failing!'))
             .assertTestFailed("failing2", equalTo('java.lang.AssertionError: failing2!'))
@@ -136,18 +137,21 @@ test {
             .assertStdout(not(containsString("err.")))
 
         junitResult.testClass("org.PassingTest")
+            .assertTestCount(2, 0, 0)
             .assertTestsExecuted("passing", "passing2")
             .assertTestPassed("passing").assertTestPassed("passing2")
             .assertStdout(equalTo("out\n"))
             .assertStderr(equalTo(""))
 
         junitResult.testClass("org.FailingTest")
+            .assertTestCount(2, 2, 0)
             .assertTestsExecuted("failing", "failing2")
             .assertTestFailed("failing", anything()).assertTestFailed("failing2", anything())
             .assertStdout(equalTo(""))
             .assertStderr(equalTo("err\n"))
 
         junitResult.testClass("org.NoOutputsTest")
+            .assertTestCount(1, 0, 0)
             .assertTestsExecuted("passing").assertTestPassed("passing")
             .assertStdout(equalTo(""))
             .assertStderr(equalTo(""))

@@ -21,7 +21,6 @@ import org.gradle.api.internal.tasks.testing.TestDescriptorInternal;
 import org.gradle.api.internal.tasks.testing.TestResultProcessor;
 import org.gradle.api.internal.tasks.testing.TestStartEvent;
 import org.gradle.api.internal.tasks.testing.junit.result.XmlTestsuite;
-import org.gradle.api.tasks.testing.TestDescriptor;
 import org.gradle.api.tasks.testing.TestOutputEvent;
 import org.gradle.internal.TimeProvider;
 import org.gradle.internal.TrueTimeProvider;
@@ -29,15 +28,15 @@ import org.gradle.internal.TrueTimeProvider;
 import java.io.File;
 import java.util.*;
 
-import static java.util.Collections.emptySet;
-
 public class TestNGJUnitXmlReportGenerator implements TestResultProcessor {
+
+    //TODO SF there's duplication between JUnit / TestNG processors wrt generation of the xml results.
 
     private final File testResultsDir;
 
-    private Map<Object, TestDescriptorInternal> tests = new HashMap<Object, TestDescriptorInternal>();
+    private Map<Object, TestInfo> tests = new HashMap<Object, TestInfo>();
     private Map<String, XmlTestsuite> testSuites = new HashMap<String, XmlTestsuite>();
-    private Map<Object, Set<Throwable>> failures = new HashMap<Object, Set<Throwable>>();
+    private Map<Object, Collection<Throwable>> failures = new HashMap<Object, Collection<Throwable>>();
 
     private TimeProvider timeProvider = new TrueTimeProvider();
 
@@ -45,12 +44,18 @@ public class TestNGJUnitXmlReportGenerator implements TestResultProcessor {
         this.testResultsDir = testResultsDir;
     }
 
+    class TestInfo {
+        TestDescriptorInternal test;
+        long started;
+        TestInfo(TestDescriptorInternal test, long started) {
+            this.test = test;
+            this.started = started;
+        }
+    }
+
     public void started(TestDescriptorInternal test, TestStartEvent event) {
         //it would be nice if we didn't have to maintain the testId->descriptor map
-        if (!tests.containsKey(test.getId())) {
-            tests.put(test.getId(), test);
-        }
-
+        tests.put(test.getId(), new TestInfo(test, event.getStartTime()));
         if (!test.isComposite()) { //test method
             if (!testSuites.containsKey(test.getClassName())) {
                 testSuites.put(test.getClassName(), new XmlTestsuite(testResultsDir, test.getClassName(), timeProvider.getCurrentTime()));
@@ -59,25 +64,24 @@ public class TestNGJUnitXmlReportGenerator implements TestResultProcessor {
     }
 
     public void completed(final Object testId, final TestCompleteEvent event) {
-        final TestDescriptorInternal test = tests.remove(testId);
-        if (!test.isComposite()) { //test method
-            XmlTestsuite xmlTestsuite = testSuites.get(test.getClassName());
-            Collection<Throwable> failures = this.failures.containsKey(testId) ? this.failures.remove(testId) : (Collection) emptySet();
-            xmlTestsuite.addTestCase(test.getName(), event.getResultType(), 0, failures);
-        } else if (test.getParent() == null) {
-            //we can reuse the same XmlReportGenerator for JUnit fairly easily
+        final TestInfo testInfo = tests.remove(testId);
+        if (!testInfo.test.isComposite()) { //test method
+            XmlTestsuite xmlTestsuite = testSuites.get(testInfo.test.getClassName());
+            Collection<Throwable> failures = this.failures.containsKey(testId) ? this.failures.remove(testId) : Collections.<Throwable>emptySet();
+            xmlTestsuite.addTestCase(testInfo.test.getName(), event.getResultType(), event.getEndTime() - testInfo.started, failures);
+        } else if (testInfo.test.getParent() == null) {
             for (XmlTestsuite xmlTestsuite : testSuites.values()) {
-                xmlTestsuite.writeSuiteData(0);
+                xmlTestsuite.writeSuiteData(0); //it's hard to reliably say when TestNG test class has finished.
             }
             testSuites.clear();
         }
     }
 
     public void output(Object testId, TestOutputEvent event) {
-        TestDescriptor test = tests.get(testId);
-        if (testSuites.containsKey(test.getClassName())) {
-            //if the suite does not exist it means the suite has already completed and we have received the output
-            testSuites.get(test.getClassName()).addOutput(event.getDestination(), event.getMessage());
+        TestInfo testInfo = tests.get(testId);
+        if (testInfo != null && testSuites.containsKey(testInfo.test.getClassName())) {
+            //if the test does not exist or suite it means it was already completed. TODO SF we should add this output to the parent.
+            testSuites.get(testInfo.test.getClassName()).addOutput(event.getDestination(), event.getMessage());
         }
     }
 
