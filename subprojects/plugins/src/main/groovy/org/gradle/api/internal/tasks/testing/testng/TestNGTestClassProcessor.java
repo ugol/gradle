@@ -17,17 +17,18 @@
 package org.gradle.api.internal.tasks.testing.testng;
 
 import groovy.lang.MissingMethodException;
-
 import org.gradle.api.GradleException;
 import org.gradle.api.internal.tasks.testing.TestClassProcessor;
+import org.gradle.api.internal.tasks.testing.TestClassRunInfo;
 import org.gradle.api.internal.tasks.testing.TestResultProcessor;
+import org.gradle.api.internal.tasks.testing.junit.TestNGJUnitXmlReportGenerator;
 import org.gradle.api.internal.tasks.testing.processors.CaptureTestOutputTestResultProcessor;
 import org.gradle.api.tasks.testing.testng.TestNGOptions;
-import org.gradle.api.internal.tasks.testing.TestClassRunInfo;
+import org.gradle.internal.id.IdGenerator;
+import org.gradle.listener.ListenerBroadcast;
 import org.gradle.logging.StandardOutputRedirector;
 import org.gradle.util.GFileUtils;
 import org.gradle.util.GUtil;
-import org.gradle.internal.id.IdGenerator;
 import org.gradle.util.ReflectionUtil;
 import org.testng.ITestListener;
 import org.testng.TestNG;
@@ -43,19 +44,28 @@ public class TestNGTestClassProcessor implements TestClassProcessor {
     private final List<File> suiteFiles;
     private final IdGenerator<?> idGenerator;
     private final StandardOutputRedirector outputRedirector;
+    private final File testResultsDir;
     private TestNGTestResultProcessorAdapter testResultProcessor;
     private ClassLoader applicationClassLoader;
 
-    public TestNGTestClassProcessor(File testReportDir, TestNGOptions options, List<File> suiteFiles, IdGenerator<?> idGenerator, StandardOutputRedirector outputRedirector) {
+    public TestNGTestClassProcessor(File testReportDir, TestNGOptions options, List<File> suiteFiles, IdGenerator<?> idGenerator,
+                                    StandardOutputRedirector outputRedirector, File testResultsDir) {
         this.testReportDir = testReportDir;
         this.options = options;
         this.suiteFiles = suiteFiles;
         this.idGenerator = idGenerator;
         this.outputRedirector = outputRedirector;
+        this.testResultsDir = testResultsDir;
     }
 
     public void startProcessing(TestResultProcessor resultProcessor) {
-        testResultProcessor = new TestNGTestResultProcessorAdapter(new CaptureTestOutputTestResultProcessor(resultProcessor, outputRedirector), idGenerator);
+        ListenerBroadcast<TestResultProcessor> processors = new ListenerBroadcast<TestResultProcessor>(TestResultProcessor.class);
+        processors.add(resultProcessor);
+        processors.add(new TestNGJUnitXmlReportGenerator(testResultsDir));
+        TestResultProcessor resultProcessorChain = new CaptureTestOutputTestResultProcessor(processors.getSource(), outputRedirector);
+
+        testResultProcessor = new TestNGTestResultProcessorAdapter(resultProcessorChain, idGenerator);
+
         applicationClassLoader = Thread.currentThread().getContextClassLoader();
     }
 
