@@ -78,7 +78,7 @@ public class TestNGTestFramework implements TestFramework {
             return;
         }
         LOG.info("Generating html test report...");
-        reporter.setTestReportDir(new File(testTask.getTestReportDir(), "../new-report"));
+        reporter.setTestReportDir(testTask.getTestReportDir());
         reporter.setTestResultsDir(testTask.getTestResultsDir());
         reporter.generateReport();
     }
@@ -109,7 +109,8 @@ public class TestNGTestFramework implements TestFramework {
         }
 
         public TestClassProcessor create(ServiceRegistry serviceRegistry) {
-            return new TestNGTestClassProcessor(testReportDir, options, suiteFiles, serviceRegistry.get(IdGenerator.class), new JULRedirector(), testResultsDir);
+            File testNGReportsDir = new File(testReportDir, "../old-testNG-reports");
+            return new TestNGTestClassProcessor(testNGReportsDir, options, suiteFiles, serviceRegistry.get(IdGenerator.class), new JULRedirector(), testResultsDir);
         }
     }
 }

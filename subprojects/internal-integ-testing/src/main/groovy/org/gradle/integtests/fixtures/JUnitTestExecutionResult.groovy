@@ -29,6 +29,10 @@ class JUnitTestExecutionResult implements TestExecutionResult {
         this.buildDir = projectDir.file(buildDirName)
     }
 
+    boolean hasJUnitXmlResults() {
+        xmlResultsDir().list().length > 0
+    }
+
     TestExecutionResult assertTestClassesExecuted(String... testClasses) {
         Map<String, File> classes = findClasses()
         assertThat(classes.keySet(), equalTo(testClasses as Set));
@@ -48,7 +52,7 @@ class JUnitTestExecutionResult implements TestExecutionResult {
     }
 
     private def findClasses() {
-        buildDir.file('test-results').assertIsDir()
+        xmlResultsDir().assertIsDir()
         buildDir.file('reports/tests/index.html').assertIsFile()
 
         Map<String, File> classes = [:]
@@ -59,6 +63,10 @@ class JUnitTestExecutionResult implements TestExecutionResult {
             }
         }
         return classes
+    }
+
+    private TestFile xmlResultsDir() {
+        buildDir.file('test-results')
     }
 }
 
