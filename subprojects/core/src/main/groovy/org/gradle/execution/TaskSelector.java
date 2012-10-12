@@ -28,8 +28,7 @@ import java.util.Set;
 
 public class TaskSelector {
     private final TaskNameResolver taskNameResolver;
-    private Set<Task> tasks;
-    private String taskName;
+    private GradleInternal gradle;
 
     public TaskSelector() {
         this(new TaskNameResolver());
@@ -39,11 +38,12 @@ public class TaskSelector {
         this.taskNameResolver = taskNameResolver;
     }
 
-    public void selectTasks(GradleInternal gradle, String path) {
+    public TaskSelection getSelection(String path) {
         SetMultimap<String, Task> tasksByName;
         String baseName;
         String prefix;
 
+        assert gradle != null : "selector should have been earlier initialized with Gradle instance";
         ProjectInternal project = gradle.getDefaultProject();
 
         if (path.contains(Project.PATH_SEPARATOR)) {
@@ -64,9 +64,7 @@ public class TaskSelector {
         Set<Task> tasks = tasksByName.get(baseName);
         if (!tasks.isEmpty()) {
             // An exact match
-            this.tasks = tasks;
-            this.taskName = path;
-            return;
+            return new TaskSelection(path, tasks);
         }
 
         NameMatcher matcher = new NameMatcher();
@@ -74,20 +72,10 @@ public class TaskSelector {
 
         if (actualName != null) {
             // A partial match
-            this.tasks = tasksByName.get(actualName);
-            this.taskName = prefix + actualName;
-            return;
+            return new TaskSelection(prefix + actualName, tasksByName.get(actualName));
         }
 
         throw new TaskSelectionException(matcher.formatErrorMessage("task", project));
-    }
-
-    public String getTaskName() {
-        return taskName;
-    }
-
-    public Set<Task> getTasks() {
-        return tasks;
     }
 
     private static ProjectInternal findProject(ProjectInternal startFrom, String path) {
@@ -113,5 +101,27 @@ public class TaskSelector {
         }
 
         return (ProjectInternal) current;
+    }
+
+    public void init(GradleInternal gradle) {
+        this.gradle = gradle;
+    }
+
+    public static class TaskSelection {
+        private String taskName;
+        private Set<Task> tasks;
+
+        public TaskSelection(String taskName, Set<Task> tasks) {
+            this.taskName = taskName;
+            this.tasks = tasks;
+        }
+
+        public String getTaskName() {
+            return taskName;
+        }
+
+        public Set<Task> getTasks() {
+            return tasks;
+        }
     }
 }

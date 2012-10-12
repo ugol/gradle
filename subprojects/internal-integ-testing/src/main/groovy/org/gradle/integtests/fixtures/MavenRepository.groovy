@@ -24,21 +24,12 @@ import java.text.SimpleDateFormat
 /**
  * A fixture for dealing with Maven repositories.
  */
-class MavenRepository {
-    final TestFile rootDir
+interface MavenRepository {
+    URI getUri()
 
-    MavenRepository(TestFile rootDir) {
-        this.rootDir = rootDir
-    }
+    MavenModule module(String groupId, String artifactId)
 
-    URI getUri() {
-        return rootDir.toURI()
-    }
-
-    MavenModule module(String groupId, String artifactId, Object version = '1.0') {
-        def artifactDir = rootDir.file("${groupId.replace('.', '/')}/$artifactId/$version")
-        return new MavenModule(artifactDir, groupId, artifactId, version as String)
-    }
+    MavenModule module(String groupId, String artifactId, Object version)
 }
 
 class MavenModule {
@@ -109,6 +100,7 @@ class MavenModule {
             artifactNames = names.collect { it.replace('-SNAPSHOT', "-${timestamp}-${build}")}
             artifactNames.add("maven-metadata.xml")
         }
+        assert moduleDir.isDirectory()
         Set actual = moduleDir.list() as Set
         for (name in artifactNames) {
             assert actual.remove(name)

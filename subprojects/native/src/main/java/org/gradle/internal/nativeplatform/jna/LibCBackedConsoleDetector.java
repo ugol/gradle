@@ -17,19 +17,38 @@
 package org.gradle.internal.nativeplatform.jna;
 
 import org.gradle.internal.UncheckedException;
-import org.gradle.internal.nativeplatform.TerminalDetector;
+import org.gradle.internal.nativeplatform.console.ConsoleMetaData;
+import org.gradle.internal.nativeplatform.console.UnixConsoleMetaData;
+import org.gradle.internal.nativeplatform.console.ConsoleDetector;
 
 import java.io.FileDescriptor;
 import java.lang.reflect.Field;
 
-public class LibCBackedTerminalDetector implements TerminalDetector {
+public class LibCBackedConsoleDetector implements ConsoleDetector {
     private final LibC libC;
 
-    public LibCBackedTerminalDetector(LibC libC) {
+    public LibCBackedConsoleDetector(LibC libC) {
         this.libC = libC;
     }
 
-    public boolean isTerminal(FileDescriptor fileDescriptor) {
+    public ConsoleMetaData getConsole() {
+        boolean stdout = checkIsConsole(FileDescriptor.out);
+        boolean stderr = checkIsConsole(FileDescriptor.err);
+        if (!stdout && !stderr) {
+            return null;
+        }
+
+        // Dumb terminal doesn't support ANSI control codes. Should really be using termcap database.
+        String term = System.getenv("TERM");
+        if (term != null && term.equals("dumb")) {
+            return null;
+        }
+
+        // Assume a terminal
+        return new UnixConsoleMetaData(stdout, stderr);
+    }
+
+    private boolean checkIsConsole(FileDescriptor fileDescriptor) {
         int osFileDesc;
         try {
             Field fdField = FileDescriptor.class.getDeclaredField("fd");
@@ -40,17 +59,6 @@ public class LibCBackedTerminalDetector implements TerminalDetector {
         }
 
         // Determine if we're connected to a terminal
-        if (libC.isatty(osFileDesc) == 0) {
-            return false;
-        }
-
-        // Dumb terminal doesn't support ANSI control codes. Should really be using termcap database.
-        String term = System.getenv("TERM");
-        if (term != null && term.equals("dumb")) {
-            return false;
-        }
-
-        // Assume a terminal
-        return true;
+        return libC.isatty(osFileDesc) != 0;
     }
 }

@@ -17,30 +17,26 @@
 package org.gradle.api.tasks.diagnostics
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.MavenRepository
 
 import static org.gradle.util.TextUtil.toPlatformLineSeparators
 
 class DependencyInsightReportTaskIntegrationTest extends AbstractIntegrationSpec {
-
-    def repo = new MavenRepository(file("repo"))
-
     def setup() {
         distribution.requireOwnUserHomeDir()
     }
 
     def "shows basic single tree with repeated dependency"() {
         given:
-        repo.module("org", "leaf1").publish()
-        repo.module("org", "leaf2").publish()
+        mavenRepo.module("org", "leaf1").publish()
+        mavenRepo.module("org", "leaf2").publish()
 
-        repo.module("org", "middle").dependsOn("leaf1", "leaf2").publish()
+        mavenRepo.module("org", "middle").dependsOn("leaf1", "leaf2").publish()
 
-        repo.module("org", "top").dependsOn("middle", "leaf2").publish()
+        mavenRepo.module("org", "top").dependsOn("middle", "leaf2").publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -49,7 +45,7 @@ class DependencyInsightReportTaskIntegrationTest extends AbstractIntegrationSpec
                 conf 'org:top:1.0'
             }
             task insight(type: DependencyInsightReportTask) {
-                includes = { it.requested.name == 'leaf2' }
+                dependency { it.requested.name == 'leaf2' }
                 configuration = configurations.conf
             }
         """
@@ -71,29 +67,27 @@ org:leaf2:1.0
 
     def "basic dependency insight with conflicting versions"() {
         given:
-        repo.module("org", "leaf1").publish()
-        repo.module("org", "leaf2").publish()
-        repo.module("org", "leaf2", 1.5).publish()
-        repo.module("org", "leaf2", 2.5).publish()
-        repo.module("org", "leaf3").publish()
-        repo.module("org", "leaf4").publish()
+        mavenRepo.module("org", "leaf1").publish()
+        mavenRepo.module("org", "leaf2").publish()
+        mavenRepo.module("org", "leaf2", 1.5).publish()
+        mavenRepo.module("org", "leaf2", 2.5).publish()
+        mavenRepo.module("org", "leaf3").publish()
+        mavenRepo.module("org", "leaf4").publish()
 
-        repo.module("org", "middle1").dependsOn('leaf1', 'leaf2').publish()
-        repo.module("org", "middle2").dependsOn('leaf3', 'leaf4').publish()
-        repo.module("org", "middle3").dependsOn('leaf2').publish()
+        mavenRepo.module("org", "middle1").dependsOn('leaf1', 'leaf2').publish()
+        mavenRepo.module("org", "middle2").dependsOn('leaf3', 'leaf4').publish()
+        mavenRepo.module("org", "middle3").dependsOn('leaf2').publish()
 
-        repo.module("org", "toplevel").dependsOn("middle1", "middle2").publish()
+        mavenRepo.module("org", "toplevel").dependsOn("middle1", "middle2").publish()
 
-        repo.module("org", "toplevel2").dependsOn("org", "leaf2", "1.5").publish()
-        repo.module("org", "toplevel3").dependsOn("org", "leaf2", "2.5").publish()
+        mavenRepo.module("org", "toplevel2").dependsOn("org", "leaf2", "1.5").publish()
+        mavenRepo.module("org", "toplevel3").dependsOn("org", "leaf2", "2.5").publish()
 
-        repo.module("org", "toplevel4").dependsOn("middle3").publish()
+        mavenRepo.module("org", "toplevel4").dependsOn("middle3").publish()
 
         file("build.gradle") << """
-            apply plugin: DependencyReportingPlugin
-
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
 
             configurations {
@@ -105,7 +99,7 @@ org:leaf2:1.0
         """
 
         when:
-        run "dependencyInsight", "--includes", "leaf2", "--configuration", "conf"
+        run "dependencyInsight", "--dependency", "leaf2", "--configuration", "conf"
 
         then:
         output.contains(toPlatformLineSeparators("""
@@ -129,15 +123,15 @@ org:leaf2:1.5 -> 2.5
 
     def "shows forced version"() {
         given:
-        repo.module("org", "leaf", 1.0).publish()
-        repo.module("org", "leaf", 2.0).publish()
+        mavenRepo.module("org", "leaf", 1.0).publish()
+        mavenRepo.module("org", "leaf", 2.0).publish()
 
-        repo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
-        repo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
+        mavenRepo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
+        mavenRepo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -148,7 +142,7 @@ org:leaf2:1.5 -> 2.5
             }
             task insight(type: DependencyInsightReportTask) {
                 configuration = configurations.conf
-                includes = { it.requested.name == 'leaf' }
+                dependency { it.requested.name == 'leaf' }
             }
         """
 
@@ -169,15 +163,15 @@ org:leaf:2.0 -> 1.0
 
     def "forced version matches the conflict resolution"() {
         given:
-        repo.module("org", "leaf", 1.0).publish()
-        repo.module("org", "leaf", 2.0).publish()
+        mavenRepo.module("org", "leaf", 1.0).publish()
+        mavenRepo.module("org", "leaf", 2.0).publish()
 
-        repo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
-        repo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
+        mavenRepo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
+        mavenRepo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -188,7 +182,7 @@ org:leaf:2.0 -> 1.0
             }
             task insight(type: DependencyInsightReportTask) {
                 configuration = configurations.conf
-                includes = { it.requested.name == 'leaf' }
+                dependency { it.requested.name == 'leaf' }
             }
         """
 
@@ -209,16 +203,16 @@ org:leaf:1.0 -> 2.0
 
     def "forced version does not match anything in the graph"() {
         given:
-        repo.module("org", "leaf", 1.0).publish()
-        repo.module("org", "leaf", 2.0).publish()
-        repo.module("org", "leaf", 1.5).publish()
+        mavenRepo.module("org", "leaf", 1.0).publish()
+        mavenRepo.module("org", "leaf", 2.0).publish()
+        mavenRepo.module("org", "leaf", 1.5).publish()
 
-        repo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
-        repo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
+        mavenRepo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
+        mavenRepo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -229,7 +223,7 @@ org:leaf:1.0 -> 2.0
             }
             task insight(type: DependencyInsightReportTask) {
                 configuration = configurations.conf
-                includes = { it.requested.name == 'leaf' }
+                dependency { it.requested.name == 'leaf' }
             }
         """
 
@@ -252,15 +246,15 @@ org:leaf:2.0 -> 1.5
 
     def "forced version at dependency level"() {
         given:
-        repo.module("org", "leaf", 1.0).publish()
-        repo.module("org", "leaf", 2.0).publish()
+        mavenRepo.module("org", "leaf", 1.0).publish()
+        mavenRepo.module("org", "leaf", 2.0).publish()
 
-        repo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
-        repo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
+        mavenRepo.module("org", "foo", 1.0).dependsOn('org', 'leaf', '1.0').publish()
+        mavenRepo.module("org", "bar", 1.0).dependsOn('org', 'leaf', '2.0').publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -273,7 +267,7 @@ org:leaf:2.0 -> 1.5
             }
             task insight(type: DependencyInsightReportTask) {
                 configuration = configurations.conf
-                includes = { it.requested.name == 'leaf' }
+                dependency { it.requested.name == 'leaf' }
             }
         """
 
@@ -297,7 +291,7 @@ org:leaf:2.0 -> 1.0
         given:
         file("build.gradle") << """
             task insight(type: DependencyInsightReportTask) {
-                includes = { it.requested.name == 'leaf2' }
+                dependency { it.requested.name == 'leaf2' }
             }
         """
 
@@ -315,7 +309,7 @@ org:leaf:2.0 -> 1.0
                 conf
             }
             task insight(type: DependencyInsightReportTask) {
-                includes = { it.requested.name == 'whatever' }
+                dependency { it.requested.name == 'whatever' }
                 configuration = configurations.conf
             }
         """
@@ -329,11 +323,11 @@ org:leaf:2.0 -> 1.0
 
     def "informs that nothing matches the input dependency"() {
         given:
-        repo.module("org", "top").publish()
+        mavenRepo.module("org", "top").publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -342,7 +336,7 @@ org:leaf:2.0 -> 1.0
                 conf 'org:top:1.0'
             }
             task insight(type: DependencyInsightReportTask) {
-                includes = { it.requested.name == 'foo.unknown' }
+                dependency { it.requested.name == 'foo.unknown' }
                 configuration = configurations.conf
             }
         """
@@ -356,11 +350,11 @@ org:leaf:2.0 -> 1.0
 
     def "deals with unresolved dependencies"() {
         given:
-        repo.module("org", "top").dependsOn("middle").publish()
+        mavenRepo.module("org", "top").dependsOn("middle").publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -369,7 +363,7 @@ org:leaf:2.0 -> 1.0
                 conf 'org:top:1.0'
             }
             task insight(type: DependencyInsightReportTask) {
-                includes = { it.requested.name == 'middle' }
+                dependency { it.requested.name == 'middle' }
                 configuration = configurations.conf
             }
         """
@@ -383,12 +377,12 @@ org:leaf:2.0 -> 1.0
 
     def "deals with dependency cycles"() {
         given:
-        repo.module("org", "leaf1").dependsOn("leaf2").publish()
-        repo.module("org", "leaf2").dependsOn("leaf1").publish()
+        mavenRepo.module("org", "leaf1").dependsOn("leaf2").publish()
+        mavenRepo.module("org", "leaf2").dependsOn("leaf1").publish()
 
         file("build.gradle") << """
             repositories {
-                maven { url "${repo.uri}" }
+                maven { url "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -397,7 +391,7 @@ org:leaf:2.0 -> 1.0
                 conf 'org:leaf1:1.0'
             }
             task insight(type: DependencyInsightReportTask) {
-                includes = { it.requested.name == 'leaf2' }
+                dependency { it.requested.name == 'leaf2' }
                 configuration = configurations.conf
             }
         """

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package org.gradle.internal.nativeplatform;
+package org.gradle.internal.nativeplatform.console;
 
-import java.io.FileDescriptor;
-
-public interface TerminalDetector {
-    boolean isTerminal(FileDescriptor fileDescriptor);
+public class NoOpConsoleDetector implements ConsoleDetector {
+    public ConsoleMetaData getConsole() {
+        return null;
+    }
 }

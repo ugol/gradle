@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-package org.gradle.internal.nativeplatform;
+package org.gradle.internal.nativeplatform.console;
 
 import org.fusesource.jansi.WindowsAnsiOutputStream;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FileDescriptor;
 import java.io.IOException;
 
-public class WindowsTerminalDetector implements TerminalDetector {
-    public boolean isTerminal(FileDescriptor fileDescriptor) {
+public class WindowsConsoleDetector implements ConsoleDetector {
+    public ConsoleMetaData getConsole() {
         // Use Jansi's detection mechanism
         try {
             new WindowsAnsiOutputStream(new ByteArrayOutputStream());
-            return true;
+            return new FallbackConsoleMetaData();
         } catch (IOException ignore) {
             // Not attached to a console
-            return false;
+            return null;
         }
     }
 }

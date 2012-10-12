@@ -56,8 +56,6 @@ task listJars << {
         server.expectHead('/repo/group/projectA-1.2.jar', module.jarFile)
         server.expectGet('/repo/group/projectA-1.2.jar', module.jarFile)
 
-        and:
-        progressLogging.withProgressLogging(getExecuter())
         then:
         succeeds 'listJars'
         and:
@@ -65,12 +63,9 @@ task listJars << {
         progressLogging.downloadProgressLogged("http://localhost:${server.port}/repo/group/projectA-1.2.jar")
         when:
         server.resetExpectations()
-        progressLogging.resetExpectations()
         // No extra calls for cached dependencies
-
         then:
         succeeds 'listJars'
-        progressLogging.noProgressLogged()
     }
 
     public void "honours changing patterns from custom resolver"() {

@@ -17,6 +17,10 @@
 
 package org.gradle.integtests.publish.ivy
 
+import org.gradle.integtests.fixtures.AbstractIntegrationSpec
+import org.gradle.integtests.fixtures.HttpServer
+import org.gradle.integtests.fixtures.IvyModule
+import org.gradle.integtests.fixtures.ProgressLoggingFixture
 import org.gradle.util.GradleVersion
 import org.gradle.util.Jvm
 import org.gradle.util.TestFile
@@ -25,7 +29,6 @@ import org.hamcrest.Matchers
 import org.junit.Rule
 import org.mortbay.jetty.HttpStatus
 import spock.lang.Unroll
-import org.gradle.integtests.fixtures.*
 
 import static org.gradle.integtests.fixtures.UserAgentMatcher.matchesNameAndVersion
 
@@ -44,8 +47,7 @@ credentials {
     private IvyModule module
 
     def setup() {
-        def repo = new IvyRepository(distribution.testFile('ivy-repo'))
-        module = repo.module("org.gradle", "publish", "2")
+        module = ivyRepo.module("org.gradle", "publish", "2")
         module.moduleDir.mkdirs()
         //for unknown os tests
         file("gradle.properties") << System.properties.findAll {key, value -> key.startsWith("os.")}.collect {key, value -> "systemProp.${key}=$value"}.join("\n")
@@ -55,12 +57,12 @@ credentials {
     public void canPublishToUnauthenticatedHttpRepository() {
         given:
         server.start()
-
         settingsFile << 'rootProject.name = "publish"'
         buildFile << """
 apply plugin: 'java'
 version = '2'
 group = 'org.gradle'
+
 uploadArchives {
     repositories {
         ivy {
@@ -74,8 +76,6 @@ uploadArchives {
         expectUpload('/org.gradle/publish/2/ivy-2.xml', module, module.ivyFile, HttpStatus.ORDINAL_201_Created)
 
         and:
-        progressLogging.withProgressLogging(getExecuter())
-        and:
         succeeds 'uploadArchives'
 
         then:
@@ -85,9 +85,10 @@ uploadArchives {
         module.jarFile.assertIsCopyOf(file('build/libs/publish-2.jar'))
         module.assertChecksumPublishedFor(module.jarFile)
         and:
-        progressLogging.uploadProgressLogged("http://localhost:${server.port}/org.gradle/publish/2/publish-2.jar")
         progressLogging.uploadProgressLogged("http://localhost:${server.port}/org.gradle/publish/2/ivy-2.xml")
+        progressLogging.uploadProgressLogged("http://localhost:${server.port}/org.gradle/publish/2/publish-2.jar")
     }
+
 
     @Unroll
     def "can publish to authenticated repository using #authScheme auth"() {
@@ -113,7 +114,6 @@ uploadArchives {
 """
 
         when:
-        progressLogging.withProgressLogging(getExecuter())
         server.authenticationScheme = authScheme
         expectUpload('/org.gradle/publish/2/publish-2.jar', module, module.jarFile, 'testuser', 'password')
         expectUpload('/org.gradle/publish/2/ivy-2.xml', module, module.ivyFile, 'testuser', 'password')
@@ -128,8 +128,8 @@ uploadArchives {
         module.assertChecksumPublishedFor(module.jarFile)
 
         and:
-        progressLogging.uploadProgressLogged("http://localhost:${server.port}/org.gradle/publish/2/publish-2.jar")
         progressLogging.uploadProgressLogged("http://localhost:${server.port}/org.gradle/publish/2/ivy-2.xml")
+        progressLogging.uploadProgressLogged("http://localhost:${server.port}/org.gradle/publish/2/publish-2.jar")
 
         where:
         authScheme << [HttpServer.AuthScheme.BASIC, HttpServer.AuthScheme.DIGEST]

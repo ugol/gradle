@@ -42,8 +42,8 @@ public class ExcludedTaskFilteringBuildConfigurationAction implements BuildConfi
         if (!excludedTaskNames.isEmpty()) {
             final Set<Task> excludedTasks = new HashSet<Task>();
             for (String taskName : excludedTaskNames) {
-                selector.selectTasks(gradle, taskName);
-                excludedTasks.addAll(selector.getTasks());
+                selector.init(gradle);
+                excludedTasks.addAll(selector.getSelection(taskName).getTasks());
             }
             gradle.getTaskGraph().useFilter(new Spec<Task>() {
                 public boolean isSatisfiedBy(Task task) {

@@ -40,10 +40,10 @@ abstract class AbstractDependencyResolutionTest extends AbstractIntegrationSpec 
     }
 
     IvyRepository ivyRepo(def dir = 'ivy-repo') {
-        return new IvyRepository(distribution.testFile(dir))
+        return ivy(dir)
     }
 
     MavenRepository mavenRepo(String name = "repo") {
-        return new MavenRepository(file(name))
+        return maven(name)
     }
 }

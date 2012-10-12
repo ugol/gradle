@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package org.gradle.internal.nativeplatform;
+package org.gradle.logging.internal;
 
-import java.io.FileDescriptor;
+import java.util.List;
 
-public class NoOpTerminalDetector implements TerminalDetector {
-    public boolean isTerminal(FileDescriptor fileDescriptor) {
-        return false;
-    }
+public interface StatusBarFormatter {
+    String format(List<ConsoleBackedProgressRenderer.Operation> operations);
 }

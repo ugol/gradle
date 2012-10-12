@@ -17,16 +17,22 @@
 package org.gradle.api.tasks
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
+import spock.lang.Ignore
 
 /**
  * by Szczepan Faber, created at: 9/5/12
  */
 class TaskCommandLineConfigurationIntegrationSpec extends AbstractIntegrationSpec {
 
-    def "can configure task from command line"() {
+    def "can configure task from command line in multiple projects"() {
         given:
+        file("settings.gradle") << "include 'project2'"
         file("build.gradle") << """
-            task someTask(type: SomeTask)
+            allprojects {
+                task someTask(type: SomeTask)
+            }
+            task task1 //extra stress
+            task task2
 
             import org.gradle.api.internal.tasks.CommandLineOption
 
@@ -64,11 +70,149 @@ class TaskCommandLineConfigurationIntegrationSpec extends AbstractIntegrationSpe
         output.contains 'first=false,second=null'
 
         when:
-        run 'someTask', '--first', '--second', 'hey'
+        run 'task1', 'someTask', '--first', '--second', 'hey buddy', 'task2'
 
         then:
-        output.contains 'first=true,second=hey'
+        output.count('first=true,second=hey buddy') == 2
+        result.assertTasksExecuted(":task1", ":someTask", ":project2:someTask", ":task2")
     }
 
-    //TODO SF more coverage for the unhappy scenarios: missing value, too many values
+    def "task name that matches command value is not included in execution"() {
+        given:
+        file("build.gradle") << """
+            task foo
+            task someTask(type: SomeTask)
+
+            import org.gradle.api.internal.tasks.CommandLineOption
+
+            class SomeTask extends DefaultTask {
+
+                String second
+
+                @CommandLineOption(options = "second", description = "configures 'second' field")
+                void setSecond(String second) {
+                    this.second = second
+                }
+
+                @TaskAction
+                void renderFields() {
+                    println "second=" + second
+                }
+            }
+"""
+
+        when:
+        run 'someTask', '--second', 'foo'
+
+        then:
+        output.contains 'second=foo'
+        result.assertTasksExecuted(":someTask") //no 'foo' task
+    }
+
+    def "multiple different tasks configured at single command line"() {
+        given:
+        file("build.gradle") << """
+            task foo
+            task someTask(type: SomeTask)
+
+            import org.gradle.api.internal.tasks.CommandLineOption
+
+            class SomeTask extends DefaultTask {
+
+                String second
+
+                @CommandLineOption(options = "second", description = "configures 'second' field")
+                void setSecond(String second) {
+                    this.second = second
+                }
+
+                @TaskAction
+                void renderFields() {
+                    println "second=" + second
+                }
+            }
+"""
+
+        when:
+        run 'someTask', '--second', 'foo', 'tasks', '--all'
+
+        then:
+        output.contains 'second=foo'
+        result.assertTasksExecuted(":someTask", ":tasks")
+    }
+
+    def "using an unknown option yields decent error message"() {
+        given:
+        file("build.gradle") << """
+            task foo
+            task someTask(type: SomeTask)
+
+            import org.gradle.api.internal.tasks.CommandLineOption
+
+            class SomeTask extends DefaultTask {
+
+                String second
+
+                @CommandLineOption(options = "second", description = "configures 'second' field")
+                void setSecond(String second) {
+                    this.second = second
+                }
+
+                @TaskAction
+                void renderFields() {
+                    println "second=" + second
+                }
+            }
+"""
+
+        when:
+        runAndFail 'someTask', '--secon', 'foo'
+
+        then:
+        failure.assertHasDescription("Problem configuring task :someTask from command line. Unknown command-line option '--secon'.")
+
+        //TODO SF it's not fixable easily we would need to change some stuff in options parsing. See also ignore test method below.
+//        when:
+//        runAndFail 'someTask', '-second', 'foo'
+//
+//        then:
+//        failure.assertHasDescription("Problem configuring task :someTask from command line. Unknown command-line option '-second'.")
+
+        when:
+        runAndFail 'someTask', '--second'
+
+        then:
+        failure.assertHasDescription("Problem configuring task :someTask from command line. No argument was provided for command-line option '--second'.")
+
+        when:
+        runAndFail 'someTask', '--second', 'hey', '--second', 'buddy'
+
+        then:
+        failure.assertHasDescription("Problem configuring task :someTask from command line. Multiple arguments were provided for command-line option '--second'.")
+    }
+
+    def "single dash user error yields decent error message"() {
+        when:
+        runAndFail 'tasks', '-all'
+
+        then:
+        failure.assertHasDescription("Incorrect command line arguments: [-l, -l]. Task options require double dash, for example: 'gradle tasks --all'.")
+    }
+
+    @Ignore
+    //some existing problems with command line interface
+    def "unfriendly behavior of command line parsing"() {
+        when:
+        run '-all'
+
+        then:
+        "should fail with a decent error, not internal error (applies to all CommandLineArgumentExceptions)"
+        "should complain that there's no '-all' option"
+
+        when:
+        run 'tasks', '-refresh-dependenciess'
+
+        then:
+        "should fail in a consistent way as with '--refresh-dependenciess'"
+    }
 }
