@@ -51,7 +51,7 @@ public class JUnitXmlReportGenerator extends StateTrackingTestResultProcessor {
     @Override
     protected void completed(TestState state) {
         if (!state.equals(testSuite)) {
-            xmlTestsuite.addTestCase(state.test.getName(), state.resultType, state.getExecutionTime(), state.failures );
+            xmlTestsuite.addTestCase(state.test.getName(), state.resultType, state.getExecutionTime(), state.failures);
         } else {
             xmlTestsuite.writeSuiteData(state.getExecutionTime());
             testSuite = null;
