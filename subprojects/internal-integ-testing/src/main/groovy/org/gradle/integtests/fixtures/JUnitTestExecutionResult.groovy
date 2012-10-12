@@ -83,7 +83,6 @@ class JUnitTestClassExecutionResult implements TestClassExecutionResult {
     TestClassExecutionResult assertTestsExecuted(String... testNames) {
         Map<String, Node> testMethods = findTests()
         assertThat(testMethods.keySet(), equalTo(testNames as Set))
-        assert testClassNode.@tests == testNames.length
         this
     }
 
